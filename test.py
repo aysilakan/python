@@ -1,10 +1,11 @@
 import simulasyon
 
-izgara, baslangic = simulasyon.harita_oku("paket_ornek/test01/harita.txt")
-print("Robot burada:", baslangic)
-print("Ayarlar:", simulasyon.ayarlari_oku("paket_ornek/test01/ayarlar.json"))
+komutlar, hatalar = simulasyon.komutlari_oku("paket_ornek/test05/komutlar.txt")
 
-try:
-    simulasyon.harita_oku("paket_ornek/test06/harita.txt")
-except ValueError as hata:
-    print("Hata yakalandı:", hata)
+print("DOĞRU KOMUTLAR:")
+for k in komutlar:
+    print("  ", k)
+
+print("HATALI SATIRLAR:")
+for h in hatalar:
+    print("  ", h)
