@@ -1,0 +1,34 @@
+{
+  "konum": [
+    14,
+    8
+  ],
+  "yon": "D",
+  "batarya": 2,
+  "yuk": false,
+  "teslim": 4,
+  "carpisma": 1,
+  "toplam_adim": 63,
+  "batarya_bitti": false,
+  "en_cok_ziyaret": [
+    6,
+    6
+  ],
+  "hatali_satirlar": [
+    {
+      "satir": 48,
+      "icerik": "AL 1",
+      "neden": "AL komutundan sonra bir şey yazılmaz"
+    },
+    {
+      "satir": 55,
+      "icerik": "ILERI -1",
+      "neden": "adım sayısı pozitif tam sayı olmalı"
+    },
+    {
+      "satir": 70,
+      "icerik": "sol",
+      "neden": "bilinmeyen komut"
+    }
+  ]
+}

@@ -292,3 +292,29 @@ def log_yaz(log, dosya_yolu):
         for satir in log:
             yazici.writerow([satir["adim"], satir["komut"], satir["x"], satir["y"],
                              satir["yon"], satir["batarya"], satir["olay"]])
+
+
+
+def calistir_ve_kaydet(klasor):
+    izgara, baslangic = harita_oku(klasor + "/harita.txt")
+    ayarlar = ayarlari_oku(klasor + "/ayarlar.json")
+    komutlar, hatalar = komutlari_oku(klasor + "/komutlar.txt")
+    sonuc, log = simulasyonu_calistir(izgara, baslangic, komutlar, ayarlar)
+    sonuc["hatali_satirlar"] = hatalar
+    sonuc_yaz(sonuc, klasor + "/sonuc.json")
+    log_yaz(log, klasor + "/log.csv")
+    return sonuc
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Kullanim: python simulasyon.py <klasor>")
+    else:
+        try:
+            sonuc = calistir_ve_kaydet(sys.argv[1])
+            print("Bitti! sonuc.json ve log.csv yazildi.")
+            print("Konum:", sonuc["konum"], "Batarya:", sonuc["batarya"], "Teslim:", sonuc["teslim"])
+        except FileNotFoundError as hata:
+            print("Dosya bulunamadi:", hata.filename)
+        except ValueError as hata:
+            print("Harita hatali:", hata)
