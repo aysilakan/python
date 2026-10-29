@@ -260,3 +260,18 @@ def simulasyonu_calistir(izgara, baslangic, komutlar, ayarlar):
 
     }
     return sonuc, log
+
+
+
+def harita_metni(durum):
+    oklar = {"K": "^", "D": ">", "G": "v", "B": "<"}
+    satirlar = []
+    for y in range(len(durum["izgara"])):
+        satir = ""
+        for x in range(len(durum["izgara"][y])):
+            if x == durum["x"] and y == durum["y"]:
+                satir += oklar[durum["yon"]]
+            else:
+                satir += durum["izgara"][y][x]
+        satirlar.append(satir)
+    return "\n".join(satirlar)
