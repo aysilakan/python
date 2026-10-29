@@ -116,3 +116,37 @@ def don(durum, komut_adi):
     durum["yon"]=   YONLER[sira]
     durum["batarya"] -= maliyet
     return "DONUS"
+
+
+
+def al(durum):
+    hucre = durum["izgara"][durum["y"]][durum["x"]]
+    if hucre =="K" and not durum ["yuk"]:
+        durum["yuk"]= True
+        durum["izgara"][durum["y"]][durum["x"]]= "."
+        return "AL"
+    return "GECERSİZ"
+
+
+def birak(durum):
+    if not durum["yuk"]:
+        return "GECERSİZ"
+    hucre = durum["izgara"][durum["y"]][durum["x"]]
+    if hucre == "T":
+        durum["yuk"]= False
+        durum["teslim"] += 1
+        return "TESLIM"
+    if hucre == ".":
+        durum["yuk"]= "False"
+        durum["izgara"][durum["y"]][durum["x"]] = "K"
+        return "BIRAK"
+    return "GECERSİZ"
+
+
+def sarj(durum):
+    hucre = durum["izgara"][durum["y"]][durum["x"]]
+    if hucre == "S":
+        durum["batarya"] = durum["ayarlar"]["batarya_kapasitesi"]
+        return "SARJ"
+    return "GECERSIZ"
+
