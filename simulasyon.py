@@ -1,4 +1,6 @@
+import csv
 import json
+import sys
 
 
 def harita_oku(dosya_yolu):
@@ -275,3 +277,18 @@ def harita_metni(durum):
                 satir += durum["izgara"][y][x]
         satirlar.append(satir)
     return "\n".join(satirlar)
+
+
+
+def sonuc_yaz(sonuc, dosya_yolu):
+    with open(dosya_yolu, "w", encoding="utf-8") as f:
+        json.dump(sonuc, f, ensure_ascii=False, indent=2)
+
+
+def log_yaz(log, dosya_yolu):
+    with open(dosya_yolu, "w", encoding="utf-8", newline="") as f:
+        yazici = csv.writer(f)
+        yazici.writerow(["adim", "komut", "x", "y", "yon", "batarya", "olay"])
+        for satir in log:
+            yazici.writerow([satir["adim"], satir["komut"], satir["x"], satir["y"],
+                             satir["yon"], satir["batarya"], satir["olay"]])
