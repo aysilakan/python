@@ -187,3 +187,76 @@ def ilerle(durum, n):
         durum["ziyaret"][konum] = durum["ziyaret"].get(konum, 0) + 1
 
     return "HAREKET"
+
+
+
+def komut_uygula(durum, komut):
+    if durum["bitti"]:
+        return "DURDU"
+    komut_adi, sayi= komut
+    if komut_adi== "ILERI":
+        return ilerle(durum, sayi)
+    if komut_adi== "SAG" or komut_adi== "SOL":
+        return don(durum, komut_adi)
+    if komut_adi== "AL":
+        return al(durum)
+    if komut_adi== "BIRAK":
+        return birak(durum)
+    if komut_adi== "SARJ":
+        return sarj(durum)
+    return "GECERSİZ"
+
+
+def en_cok_ziyaret(ziyaret):
+    en_iyi= None
+    for konum, sayi in ziyaret.items():
+        if en_iyi is None:
+            en_iyi= konum
+            continue
+        en_iyi_sayi= ziyaret[en_iyi]
+        if sayi> en_iyi_sayi:
+            en_iyi= konum
+        elif sayi== en_iyi_sayi:
+            if (konum[1], konum[0])< (en_iyi[1], en_iyi[0]):
+                en_iyi= konum
+    return [en_iyi[0], en_iyi[1]]
+
+
+def komut_metni(komut):
+    komut_adi, sayi= komut
+    if sayi is None:
+        return komut_adi
+    return komut_adi + " " + str(sayi)
+
+
+def simulasyonu_calistir(izgara, baslangic, komutlar, ayarlar):
+    durum= yeni_durum(izgara, baslangic, ayarlar)
+    log= []
+
+    for sira, komut in enumerate(komutlar, start=1):
+        if durum["bitti"]:
+            break
+        olay= komut_uygula(durum, komut)
+        log.append({
+            "adim": sira,
+            "komut": komut_metni(komut),
+            "x": durum["x"],
+            "y": durum["y"],
+            "yon": durum["yon"],
+            "batarya": durum["batarya"],
+            "olay": olay,
+        })
+
+    sonuc={
+        "konum": [durum["x"], durum["y"]],
+        "yon": durum["yon"],
+        "batarya": durum["batarya"],
+        "yuk": durum["yuk"],
+        "teslim": durum["teslim"],
+        "carpisma": durum["carpisma"],
+        "toplam_adim": durum["toplam_adim"],
+        "batarya_bitti": durum["bitti"],
+        "en_cok_ziyaret": en_cok_ziyaret(durum["ziyaret"]),
+
+    }
+    return sonuc, log
