@@ -150,3 +150,40 @@ def sarj(durum):
         return "SARJ"
     return "GECERSIZ"
 
+
+
+def ilerle(durum, n):
+    ayarlar = durum["ayarlar"]
+    izgara = durum["izgara"]
+    dx, dy = YON_FARK[durum["yon"]]
+
+    for _ in range(n):
+        yeni_x = durum["x"] + dx
+        yeni_y = durum["y"] + dy
+
+        disarida= yeni_y < 0 or yeni_y>= len(izgara) or yeni_x< 0 or yeni_x >= len(izgara[0])
+        if disarida or izgara[yeni_y][yeni_x]== "#":
+            durum["carpisma"] += 1
+            ceza= ayarlar["carpisma_cezasi"]
+            if ceza> durum["batarya"]:
+                durum["batarya"]= 0
+                durum["bitti"]= True
+            else:
+                durum["batarya"] -= ceza
+            return "CARPISMA"
+
+        maliyet= ayarlar["adim_maliyeti"]
+        if durum["yuk"]:
+            maliyet= maliyet * ayarlar["yuk_carpani"]
+        if maliyet> durum["batarya"]:
+            durum["bitti"]= True
+            return "BATARYA_BITTI"
+
+        durum["x"]= yeni_x
+        durum["y"]= yeni_y
+        durum["batarya"] -= maliyet
+        durum["toplam_adim"] += 1
+        konum= (yeni_x, yeni_y)
+        durum["ziyaret"][konum] = durum["ziyaret"].get(konum, 0) + 1
+
+    return "HAREKET"
