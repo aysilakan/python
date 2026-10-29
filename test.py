@@ -1,11 +1,12 @@
 import simulasyon
 
-komutlar, hatalar = simulasyon.komutlari_oku("paket_ornek/test05/komutlar.txt")
+izgara, baslangic = simulasyon.harita_oku("paket_ornek/test01/harita.txt")
+ayarlar = simulasyon.ayarlari_oku("paket_ornek/test01/ayarlar.json")
+durum = simulasyon.yeni_durum(izgara, baslangic, ayarlar)
 
-print("DOĞRU KOMUTLAR:")
-for k in komutlar:
-    print("  ", k)
-
-print("HATALI SATIRLAR:")
-for h in hatalar:
-    print("  ", h)
+print("Başlangıç:", durum["yon"], durum["batarya"])
+simulasyon.don(durum, "SAG")
+print("SAG sonrası:", durum["yon"], durum["batarya"])
+simulasyon.don(durum, "SOL")
+simulasyon.don(durum, "SOL")
+print("2 SOL sonrası:", durum["yon"], durum["batarya"])

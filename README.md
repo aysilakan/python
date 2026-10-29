@@ -1,6 +1,6 @@
 # Depo Robotu Simülatörü
 
-Programlama Lab-I dersi, Proje 1.
+Programlama Lab-I dersi, Proje 1
 
 Grup üyeleri:
 - Aysıla Kan

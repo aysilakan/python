@@ -79,4 +79,40 @@ def komutlari_oku(dosya_yolu):
                             "neden": "bilinmeyen komut"})
 
     return komutlar, hatalar
-              
+
+
+
+YONLER=["K", "D", "G", "B"]
+YON_FARK={"K": (0, -1), "D": (1, 0), "G": (0, 1), "B": (-1, 0)}
+
+def yeni_durum(izgara, baslangic, ayarlar):
+    x, y = baslangic
+    return{
+        "izgara": [satir[:] for satir in izgara],
+        "x": x,
+        "y": y,
+        "yon": ayarlar["baslangic_yonu"],
+        "batarya": ayarlar["batarya_kapasitesi"],
+        "yuk": False,
+        "teslim": 0,
+        "carpisma": 0,
+        "toplam_adim": 0,
+        "bitti": False,
+        "ziyaret": {(x, y): 1},
+        "ayarlar": ayarlar,
+   }
+
+
+def don(durum, komut_adi):
+    maliyet= durum["ayarlar"]["donus_maliyeti"]
+    if maliyet> durum["batarya"]:
+        durum["bitti"]= True
+        return "BATARYA_BITTI"
+    sira= YONLER.index(durum["yon"])
+    if komut_adi== "SAG":
+        sira= (sira + 1) % 4
+    else:
+        sira =(sira - 1) % 4
+    durum["yon"]=   YONLER[sira]
+    durum["batarya"] -= maliyet
+    return "DONUS"
