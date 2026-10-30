@@ -76,6 +76,15 @@ def komutlari_oku(dosya_yolu):
             else:
                 komutlar.append((komut_adi, None))
 
+
+        elif komut_adi == "GIT":
+            if len(parcalar) != 3 or not parcalar[1].isdigit() or not parcalar[2].isdigit():
+                hatalar.append({"satir": satir_no, "icerik": satir,
+                                "neden": "GIT'ten sonra iki tane pozitif tam sayı olmalı (x y)"})
+            else:
+                komutlar.append(("GIT", (int(parcalar[1]), int(parcalar[2]))))
+
+           
         else:
             hatalar.append({"satir": satir_no, "icerik": satir,
                             "neden": "bilinmeyen komut"})
@@ -206,6 +215,8 @@ def komut_uygula(durum, komut):
         return birak(durum)
     if komut_adi== "SARJ":
         return sarj(durum)
+    if komut_adi == "GIT":
+        return git(durum, sayi)
     return "GECERSİZ"
 
 
@@ -228,7 +239,10 @@ def komut_metni(komut):
     komut_adi, sayi= komut
     if sayi is None:
         return komut_adi
+    if komut_adi == "GIT":
+        return "GIT " + str(sayi[0]) + " " + str(sayi[1])
     return komut_adi + " " + str(sayi)
+    
 
 
 def simulasyonu_calistir(izgara, baslangic, komutlar, ayarlar):
@@ -300,6 +314,33 @@ def en_kisa_yol(izgara, baslangic, hedef):
         kare = nereden[kare]
     yol.reverse()
     return yol
+
+def git(durum, hedef):
+    yol = en_kisa_yol(durum["izgara"], (durum["x"], durum["y"]), hedef)
+    if yol is None:
+        return "YOL_YOK"
+
+    for kare in yol:
+        dx = kare[0] - durum["x"]
+        dy = kare[1] - durum["y"]
+        for yon in YONLER:
+            if YON_FARK[yon] == (dx, dy):
+                istenen = yon
+
+        while durum["yon"] != istenen:
+            fark = (YONLER.index(istenen) - YONLER.index(durum["yon"])) % 4
+            if fark == 3:
+                olay = don(durum, "SOL")
+            else:
+                olay = don(durum, "SAG")
+            if olay != "DONUS":
+                return olay
+
+        olay = ilerle(durum, 1)
+        if olay != "HAREKET":
+            return olay
+
+    return "HAREKET"
 
 def harita_metni(durum):
     oklar = {"K": "^", "D": ">", "G": "v", "B": "<"}
