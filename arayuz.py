@@ -167,6 +167,43 @@ def sonuclari_kaydet():
     except OSError as hata:
         messagebox.showerror("Kayıt hatası", "Dosyalar yazılamadı:\n" + str(hata))
 
+def dosyalari_yukle_butonu():
+    klasor = filedialog.askdirectory(title="harita.txt, komutlar.txt ve ayarlar.json olan klasörü seçin")
+    if not klasor:
+        return
+    try:
+        izgara, baslangic = simulasyon.harita_oku(klasor + "/harita.txt")
+        ayarlar = simulasyon.ayarlari_oku(klasor + "/ayarlar.json")
+        komutlar, hatalar = simulasyon.komutlari_oku(klasor + "/komutlar.txt")
+        durum = simulasyon.yeni_durum(izgara, baslangic, ayarlar)
+    except FileNotFoundError as hata:
+        messagebox.showerror("Dosya bulunamadı", "Bu dosya bulunamadı:\n" + str(hata.filename))
+        return
+    except ValueError as hata:
+        messagebox.showerror("Hatalı dosya", "Dosya okunamadı:\n" + str(hata))
+        return
+    except KeyError as hata:
+        messagebox.showerror("Eksik ayar", "ayarlar.json içinde bu ayar yok: " + str(hata))
+        return
+
+    veri["klasor"] = klasor
+    veri["izgara"] = izgara
+    veri["baslangic"] = baslangic
+    veri["ayarlar"] = ayarlar
+    veri["komutlar"] = komutlar
+    veri["hatalar"] = hatalar
+    veri["durum"] = durum
+    veri["sira"] = 0
+    veri["log"] = []
+    haritayi_ciz()
+    bilgileri_guncelle("Dosyalar yüklendi.")
+
+    if len(hatalar) > 0:
+        mesaj = str(len(hatalar)) + " hatalı satır atlandı:\n\n"
+        for h in hatalar:
+            mesaj += "Satır " + str(h["satir"]) + ": " + h["icerik"] + "  (" + h["neden"] + ")\n"
+        messagebox.showwarning("Hatalı komut satırları", mesaj)
+
 
 # ===== 3) PENCERE =====
 pencere = tk.Tk()
@@ -174,6 +211,7 @@ pencere.title("Depo Robotu Simülatörü")
 
 butonlar = tk.Frame(pencere)
 butonlar.pack(side="top", fill="x", padx=10, pady=10)
+tk.Button(butonlar, text="Dosyaları Yükle", command=dosyalari_yukle_butonu).pack(side="left", padx=4)
 tk.Button(butonlar, text="Adım", command=adim_butonu).pack(side="left", padx=4)
 tk.Button(butonlar, text="Tümünü Çalıştır", command=tumunu_calistir_butonu).pack(side="left", padx=4)
 tk.Button(butonlar, text="Sıfırla", command=sifirla_butonu).pack(side="left", padx=4)
@@ -205,14 +243,6 @@ etiket_ilerleme.pack(anchor="w")
 etiket_log = tk.Label(pencere, text="Başlamak için 'Dosyaları Yükle'ye basın.", font=("Arial", 11), fg="#333333")
 etiket_log.pack(side="top", anchor="w", padx=10, pady=10)
 
-# --- GECICI DENEME (sonra silinecek) ---
-veri["klasor"] = "deneme_verileri/veri_1"
-veri["izgara"], veri["baslangic"] = simulasyon.harita_oku(veri["klasor"] + "/harita.txt")
-veri["ayarlar"] = simulasyon.ayarlari_oku(veri["klasor"] + "/ayarlar.json")
-veri["komutlar"], veri["hatalar"] = simulasyon.komutlari_oku(veri["klasor"] + "/komutlar.txt")
-veri["durum"] = simulasyon.yeni_durum(veri["izgara"], veri["baslangic"], veri["ayarlar"])
-haritayi_ciz()
-bilgileri_guncelle("Deneme haritası yüklendi.")
-# --- GECICI DENEME SONU ---
+
 
 pencere.mainloop()
