@@ -263,7 +263,43 @@ def simulasyonu_calistir(izgara, baslangic, komutlar, ayarlar):
     }
     return sonuc, log
 
+def en_kisa_yol(izgara, baslangic, hedef):
+    hx, hy = hedef
+    if hy < 0 or hy >= len(izgara) or hx < 0 or hx >= len(izgara[0]):
+        return None
+    if izgara[hy][hx] == "#":
+        return None
 
+    nereden = {baslangic: None}
+    kuyruk = [baslangic]
+
+    while len(kuyruk) > 0:
+        simdiki = kuyruk.pop(0)
+        if simdiki == hedef:
+            break
+        for yon in YONLER:
+            dx, dy = YON_FARK[yon]
+            x = simdiki[0] + dx
+            y = simdiki[1] + dy
+            if y < 0 or y >= len(izgara) or x < 0 or x >= len(izgara[0]):
+                continue
+            if izgara[y][x] == "#":
+                continue
+            if (x, y) in nereden:
+                continue
+            nereden[(x, y)] = simdiki
+            kuyruk.append((x, y))
+
+    if hedef not in nereden:
+        return None
+
+    yol = []
+    kare = hedef
+    while kare != baslangic:
+        yol.append(kare)
+        kare = nereden[kare]
+    yol.reverse()
+    return yol
 
 def harita_metni(durum):
     oklar = {"K": "^", "D": ">", "G": "v", "B": "<"}

@@ -1,11 +1,6 @@
 import simulasyon
 
-izgara, baslangic = simulasyon.harita_oku("paket_ornek/test03/harita.txt")
-ayarlar = simulasyon.ayarlari_oku("paket_ornek/test03/ayarlar.json")
-durum = simulasyon.yeni_durum(izgara, baslangic, ayarlar)
-
-print(simulasyon.harita_metni(durum))
-simulasyon.ilerle(durum, 3)
-simulasyon.al(durum)
-print()
-print(simulasyon.harita_metni(durum))
+izgara, baslangic = simulasyon.harita_oku("deneme_verileri/veri_1/harita.txt")
+print("Başlangıç:", baslangic)
+print("Yol:", simulasyon.en_kisa_yol(izgara, baslangic, (3, 2)))
+print("Duvara yol:", simulasyon.en_kisa_yol(izgara, baslangic, (0, 0)))
