@@ -1,0 +1,649 @@
+########## simulasyon.py ##########
+import csv
+import json
+import sys
+
+
+def harita_oku(dosya_yolu):
+    with open(dosya_yolu, encoding="utf-8") as f:
+        satirlar= f.read().splitlines()
+
+    satirlar = [s for s in satirlar if s.strip() != ""]
+    if len(satirlar)==0:
+        raise ValueError("harita dosyası boş")
+
+    izgara= []
+    for satir in satirlar:
+        izgara.append(list(satir))
+
+    ilk_uzunluk=len(izgara[0])
+    for satir in izgara:
+        if len(satir) !=ilk_uzunluk:
+            raise ValueError("haritada ki satırların uzunlukları farklı")
+
+    robotlar= []
+    for y in range(len(izgara)):
+        for x in range(len(izgara[y])):
+            if izgara[y][x]== "R":
+                robotlar.append((x,y))
+
+    if len(robotlar)==0:
+        raise ValueError("haritada robot (R) yok")
+    if len(robotlar)>1:
+        raise ValueError("haritada birden fazla robot (R) var")
+
+    x, y = robotlar[0]
+    izgara[y][x]= "."
+    return izgara, (x, y)
+
+def ayarlari_oku(dosya_yolu):
+    with open (dosya_yolu, encoding="utf-8") as f:
+        return json.load(f)
+
+
+
+def komutlari_oku(dosya_yolu):
+    komutlar = []
+    hatalar = []
+
+    with open(dosya_yolu, encoding="utf-8") as f:
+        satirlar = f.read().splitlines()
+
+    for satir_no, satir in enumerate(satirlar, start=1):
+        parcalar= satir.split()
+
+        if len(parcalar) ==0:
+            continue
+
+        komut_adi= parcalar[0]
+
+        if komut_adi== "ILERI":
+            if len(parcalar) !=2:
+                hatalar.append({"satir": satir_no, "icerik": satir,
+                                "neden": "ILERI'den sonra tek bir sayı olmalı"})
+                
+            elif not parcalar[1].isdigit() or int(parcalar[1])== 0:
+                hatalar.append({"satir": satir_no, "icerik": satir,
+                                "neden":"adım sayısı pozitif tam sayı olmalı"})
+                
+            else:
+                komutlar.append(("ILERI", int(parcalar[1])))
+
+        elif komut_adi in ["SAG", "SOL", "AL", "BIRAK", "SARJ"]:
+            if len(parcalar) !=1:
+                hatalar.append({"satir": satir_no, "icerik": satir,
+                                "neden": komut_adi + " komutundan sonra bir şey yazılmaz"})
+
+            else:
+                komutlar.append((komut_adi, None))
+
+
+        elif komut_adi == "GIT":
+            if len(parcalar) != 3 or not parcalar[1].isdigit() or not parcalar[2].isdigit():
+                hatalar.append({"satir": satir_no, "icerik": satir,
+                                "neden": "GIT'ten sonra iki tane pozitif tam sayı olmalı (x y)"})
+            else:
+                komutlar.append(("GIT", (int(parcalar[1]), int(parcalar[2]))))
+
+           
+        else:
+            hatalar.append({"satir": satir_no, "icerik": satir,
+                            "neden": "bilinmeyen komut"})
+
+    return komutlar, hatalar
+
+
+
+YONLER=["K", "D", "G", "B"]
+YON_FARK={"K": (0, -1), "D": (1, 0), "G": (0, 1), "B": (-1, 0)}
+
+def yeni_durum(izgara, baslangic, ayarlar):
+    x, y = baslangic
+    return{
+        "izgara": [satir[:] for satir in izgara],
+        "x": x,
+        "y": y,
+        "yon": ayarlar["baslangic_yonu"],
+        "batarya": ayarlar["batarya_kapasitesi"],
+        "yuk": False,
+        "teslim": 0,
+        "carpisma": 0,
+        "toplam_adim": 0,
+        "bitti": False,
+        "ziyaret": {(x, y): 1},
+        "ayarlar": ayarlar,
+   }
+
+
+def don(durum, komut_adi):
+    maliyet= durum["ayarlar"]["donus_maliyeti"]
+    if maliyet> durum["batarya"]:
+        durum["bitti"]= True
+        return "BATARYA_BITTI"
+    sira= YONLER.index(durum["yon"])
+    if komut_adi== "SAG":
+        sira= (sira + 1) % 4
+    else:
+        sira =(sira - 1) % 4
+    durum["yon"]=   YONLER[sira]
+    durum["batarya"] -= maliyet
+    return "DONUS"
+
+
+
+def al(durum):
+    hucre = durum["izgara"][durum["y"]][durum["x"]]
+    if hucre =="K" and not durum ["yuk"]:
+        durum["yuk"]= True
+        durum["izgara"][durum["y"]][durum["x"]]= "."
+        return "AL"
+    return "GECERSİZ"
+
+
+def birak(durum):
+    if not durum["yuk"]:
+        return "GECERSİZ"
+    hucre = durum["izgara"][durum["y"]][durum["x"]]
+    if hucre == "T":
+        durum["yuk"]= False
+        durum["teslim"] += 1
+        return "TESLIM"
+    if hucre == ".":
+        durum["yuk"]= "False"
+        durum["izgara"][durum["y"]][durum["x"]] = "K"
+        return "BIRAK"
+    return "GECERSİZ"
+
+
+def sarj(durum):
+    hucre = durum["izgara"][durum["y"]][durum["x"]]
+    if hucre == "S":
+        durum["batarya"] = durum["ayarlar"]["batarya_kapasitesi"]
+        return "SARJ"
+    return "GECERSIZ"
+
+
+
+def ilerle(durum, n):
+    ayarlar = durum["ayarlar"]
+    izgara = durum["izgara"]
+    dx, dy = YON_FARK[durum["yon"]]
+
+    for _ in range(n):
+        yeni_x = durum["x"] + dx
+        yeni_y = durum["y"] + dy
+
+        disarida= yeni_y < 0 or yeni_y>= len(izgara) or yeni_x< 0 or yeni_x >= len(izgara[0])
+        if disarida or izgara[yeni_y][yeni_x]== "#":
+            durum["carpisma"] += 1
+            ceza= ayarlar["carpisma_cezasi"]
+            if ceza> durum["batarya"]:
+                durum["batarya"]= 0
+                durum["bitti"]= True
+            else:
+                durum["batarya"] -= ceza
+            return "CARPISMA"
+
+        maliyet= ayarlar["adim_maliyeti"]
+        if durum["yuk"]:
+            maliyet= maliyet * ayarlar["yuk_carpani"]
+        if maliyet> durum["batarya"]:
+            durum["bitti"]= True
+            return "BATARYA_BITTI"
+
+        durum["x"]= yeni_x
+        durum["y"]= yeni_y
+        durum["batarya"] -= maliyet
+        durum["toplam_adim"] += 1
+        konum= (yeni_x, yeni_y)
+        durum["ziyaret"][konum] = durum["ziyaret"].get(konum, 0) + 1
+
+    return "HAREKET"
+
+
+
+def komut_uygula(durum, komut):
+    if durum["bitti"]:
+        return "DURDU"
+    komut_adi, sayi= komut
+    if komut_adi== "ILERI":
+        return ilerle(durum, sayi)
+    if komut_adi== "SAG" or komut_adi== "SOL":
+        return don(durum, komut_adi)
+    if komut_adi== "AL":
+        return al(durum)
+    if komut_adi== "BIRAK":
+        return birak(durum)
+    if komut_adi== "SARJ":
+        return sarj(durum)
+    if komut_adi == "GIT":
+        return git(durum, sayi)
+    return "GECERSİZ"
+
+
+def en_cok_ziyaret(ziyaret):
+    en_iyi= None
+    for konum, sayi in ziyaret.items():
+        if en_iyi is None:
+            en_iyi= konum
+            continue
+        en_iyi_sayi= ziyaret[en_iyi]
+        if sayi> en_iyi_sayi:
+            en_iyi= konum
+        elif sayi== en_iyi_sayi:
+            if (konum[1], konum[0])< (en_iyi[1], en_iyi[0]):
+                en_iyi= konum
+    return [en_iyi[0], en_iyi[1]]
+
+
+def komut_metni(komut):
+    komut_adi, sayi= komut
+    if sayi is None:
+        return komut_adi
+    if komut_adi == "GIT":
+        return "GIT " + str(sayi[0]) + " " + str(sayi[1])
+    return komut_adi + " " + str(sayi)
+    
+
+
+def simulasyonu_calistir(izgara, baslangic, komutlar, ayarlar):
+    durum= yeni_durum(izgara, baslangic, ayarlar)
+    log= []
+
+    for sira, komut in enumerate(komutlar, start=1):
+        if durum["bitti"]:
+            break
+        olay= komut_uygula(durum, komut)
+        log.append({
+            "adim": sira,
+            "komut": komut_metni(komut),
+            "x": durum["x"],
+            "y": durum["y"],
+            "yon": durum["yon"],
+            "batarya": durum["batarya"],
+            "olay": olay,
+        })
+
+    sonuc={
+        "konum": [durum["x"], durum["y"]],
+        "yon": durum["yon"],
+        "batarya": durum["batarya"],
+        "yuk": durum["yuk"],
+        "teslim": durum["teslim"],
+        "carpisma": durum["carpisma"],
+        "toplam_adim": durum["toplam_adim"],
+        "batarya_bitti": durum["bitti"],
+        "en_cok_ziyaret": en_cok_ziyaret(durum["ziyaret"]),
+
+    }
+    return sonuc, log
+
+def en_kisa_yol(izgara, baslangic, hedef):
+    hx, hy = hedef
+    if hy < 0 or hy >= len(izgara) or hx < 0 or hx >= len(izgara[0]):
+        return None
+    if izgara[hy][hx] == "#":
+        return None
+
+    nereden = {baslangic: None}
+    kuyruk = [baslangic]
+
+    while len(kuyruk) > 0:
+        simdiki = kuyruk.pop(0)
+        if simdiki == hedef:
+            break
+        for yon in YONLER:
+            dx, dy = YON_FARK[yon]
+            x = simdiki[0] + dx
+            y = simdiki[1] + dy
+            if y < 0 or y >= len(izgara) or x < 0 or x >= len(izgara[0]):
+                continue
+            if izgara[y][x] == "#":
+                continue
+            if (x, y) in nereden:
+                continue
+            nereden[(x, y)] = simdiki
+            kuyruk.append((x, y))
+
+    if hedef not in nereden:
+        return None
+
+    yol = []
+    kare = hedef
+    while kare != baslangic:
+        yol.append(kare)
+        kare = nereden[kare]
+    yol.reverse()
+    return yol
+
+def git(durum, hedef):
+    yol = en_kisa_yol(durum["izgara"], (durum["x"], durum["y"]), hedef)
+    if yol is None:
+        return "YOL_YOK"
+
+    for kare in yol:
+        dx = kare[0] - durum["x"]
+        dy = kare[1] - durum["y"]
+        for yon in YONLER:
+            if YON_FARK[yon] == (dx, dy):
+                istenen = yon
+
+        while durum["yon"] != istenen:
+            fark = (YONLER.index(istenen) - YONLER.index(durum["yon"])) % 4
+            if fark == 3:
+                olay = don(durum, "SOL")
+            else:
+                olay = don(durum, "SAG")
+            if olay != "DONUS":
+                return olay
+
+        olay = ilerle(durum, 1)
+        if olay != "HAREKET":
+            return olay
+
+    return "HAREKET"
+
+def harita_metni(durum):
+    oklar = {"K": "^", "D": ">", "G": "v", "B": "<"}
+    satirlar = []
+    for y in range(len(durum["izgara"])):
+        satir = ""
+        for x in range(len(durum["izgara"][y])):
+            if x == durum["x"] and y == durum["y"]:
+                satir += oklar[durum["yon"]]
+            else:
+                satir += durum["izgara"][y][x]
+        satirlar.append(satir)
+    return "\n".join(satirlar)
+
+
+
+def sonuc_yaz(sonuc, dosya_yolu):
+    with open(dosya_yolu, "w", encoding="utf-8") as f:
+        json.dump(sonuc, f, ensure_ascii=False, indent=2)
+
+
+def log_yaz(log, dosya_yolu):
+    with open(dosya_yolu, "w", encoding="utf-8", newline="") as f:
+        yazici = csv.writer(f)
+        yazici.writerow(["adim", "komut", "x", "y", "yon", "batarya", "olay"])
+        for satir in log:
+            yazici.writerow([satir["adim"], satir["komut"], satir["x"], satir["y"],
+                             satir["yon"], satir["batarya"], satir["olay"]])
+
+
+
+def calistir_ve_kaydet(klasor):
+    izgara, baslangic = harita_oku(klasor + "/harita.txt")
+    ayarlar = ayarlari_oku(klasor + "/ayarlar.json")
+    komutlar, hatalar = komutlari_oku(klasor + "/komutlar.txt")
+    sonuc, log = simulasyonu_calistir(izgara, baslangic, komutlar, ayarlar)
+    sonuc["hatali_satirlar"] = hatalar
+    sonuc_yaz(sonuc, klasor + "/sonuc.json")
+    log_yaz(log, klasor + "/log.csv")
+    return sonuc
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Kullanim: python simulasyon.py <klasor>")
+    else:
+        try:
+            sonuc = calistir_ve_kaydet(sys.argv[1])
+            print("Bitti! sonuc.json ve log.csv yazildi.")
+            print("Konum:", sonuc["konum"], "Batarya:", sonuc["batarya"], "Teslim:", sonuc["teslim"])
+        except FileNotFoundError as hata:
+            print("Dosya bulunamadi:", hata.filename)
+        except ValueError as hata:
+            print("Harita hatali:", hata)
+
+
+########## arayuz.py ##########
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import simulasyon
+
+# ===== 1) AYARLAR =====
+HUCRE = 40
+RENKLER = {"#": "#4a4a4a", ".": "#ffffff", "K": "#a0522d", "T": "#4caf50", "S": "#ffd54f"}
+YON_ADLARI = {"K": "Kuzey (yukarı)", "D": "Doğu (sağ)", "G": "Güney (aşağı)", "B": "Batı (sol)"}
+
+veri = {
+    "klasor": None,
+    "izgara": None,
+    "baslangic": None,
+    "ayarlar": None,
+    "komutlar": [],
+    "hatalar": [],
+    "durum": None,
+    "sira": 0,
+    "log": [],
+}
+
+
+# ===== 2) FONKSIYONLAR =====
+def haritayi_ciz():
+    tuval.delete("all")
+    durum = veri["durum"]
+    if durum is None:
+        return
+    izgara = durum["izgara"]
+    tuval.config(width=len(izgara[0]) * HUCRE, height=len(izgara) * HUCRE)
+
+    for y in range(len(izgara)):
+        for x in range(len(izgara[y])):
+            harf = izgara[y][x]
+            x1 = x * HUCRE
+            y1 = y * HUCRE
+            renk = RENKLER.get(harf, "#ffffff")
+            tuval.create_rectangle(x1, y1, x1 + HUCRE, y1 + HUCRE, fill=renk, outline="#cccccc")
+            if harf in "KTS":
+                tuval.create_text(x1 + HUCRE / 2, y1 + HUCRE / 2, text=harf,
+                                  fill="black", font=("Arial", 14, "bold"))
+
+    robotu_ciz(durum["x"], durum["y"], durum["yon"], durum["yuk"])
+
+
+def robotu_ciz(x, y, yon, yuk):
+    sol = x * HUCRE + 6
+    ust = y * HUCRE + 6
+    sag = (x + 1) * HUCRE - 6
+    alt = (y + 1) * HUCRE - 6
+    orta_x = (sol + sag) / 2
+    orta_y = (ust + alt) / 2
+
+    if yon == "K":
+        noktalar = [orta_x, ust, sag, alt, sol, alt]
+    elif yon == "D":
+        noktalar = [sag, orta_y, sol, alt, sol, ust]
+    elif yon == "G":
+        noktalar = [orta_x, alt, sol, ust, sag, ust]
+    else:
+        noktalar = [sol, orta_y, sag, ust, sag, alt]
+
+    tuval.create_polygon(noktalar, fill="#1e88e5", outline="#0d47a1", width=2)
+
+    if yuk:
+        tuval.create_rectangle(orta_x - 6, orta_y - 6, orta_x + 6, orta_y + 6,
+                               fill=RENKLER["K"], outline="black")
+
+
+def bilgileri_guncelle(son_olay=""):
+    durum = veri["durum"]
+    if durum is None:
+        return
+    kapasite = veri["ayarlar"]["batarya_kapasitesi"]
+    etiket_batarya.config(text="Batarya: " + str(durum["batarya"]) + " / " + str(kapasite))
+    etiket_yon.config(text="Yön: " + YON_ADLARI[durum["yon"]])
+    etiket_yuk.config(text="Yük: " + ("Var" if durum["yuk"] else "Yok"))
+    etiket_teslim.config(text="Teslim: " + str(durum["teslim"]))
+    etiket_carpisma.config(text="Çarpışma: " + str(durum["carpisma"]))
+
+    if durum["bitti"]:
+        siradaki = "- (batarya bitti)"
+    elif veri["sira"] < len(veri["komutlar"]):
+        siradaki = simulasyon.komut_metni(veri["komutlar"][veri["sira"]])
+    else:
+        siradaki = "- (komutlar bitti)"
+    etiket_siradaki.config(text="Sıradaki komut: " + siradaki)
+    etiket_ilerleme.config(text="Komut: " + str(veri["sira"]) + " / " + str(len(veri["komutlar"])))
+    etiket_log.config(text=son_olay)
+
+
+def bitti_mi():
+    return veri["durum"]["bitti"] or veri["sira"] >= len(veri["komutlar"])
+
+
+def tek_adim():
+    komut = veri["komutlar"][veri["sira"]]
+    olay = simulasyon.komut_uygula(veri["durum"], komut)
+    veri["sira"] += 1
+    durum = veri["durum"]
+    veri["log"].append({
+        "adim": veri["sira"],
+        "komut": simulasyon.komut_metni(komut),
+        "x": durum["x"],
+        "y": durum["y"],
+        "yon": durum["yon"],
+        "batarya": durum["batarya"],
+        "olay": olay,
+    })
+    return simulasyon.komut_metni(komut) + "  ->  " + olay
+
+
+def adim_butonu():
+    if veri["durum"] is None:
+        messagebox.showwarning("Uyarı", "Önce 'Dosyaları Yükle' ile bir klasör seçin.")
+        return
+    if bitti_mi():
+        messagebox.showinfo("Bilgi", "Simülasyon bitti. Baştan izlemek için 'Sıfırla'ya basın.")
+        return
+    son_olay = tek_adim()
+    haritayi_ciz()
+    bilgileri_guncelle(son_olay)
+    if bitti_mi():
+        sonuclari_kaydet()
+
+
+def tumunu_calistir_butonu():
+    if veri["durum"] is None:
+        messagebox.showwarning("Uyarı", "Önce 'Dosyaları Yükle' ile bir klasör seçin.")
+        return
+    son_olay = ""
+    while not bitti_mi():
+        son_olay = tek_adim()
+    haritayi_ciz()
+    bilgileri_guncelle(son_olay)
+    sonuclari_kaydet()
+
+
+def sifirla_butonu():
+    if veri["izgara"] is None:
+        return
+    veri["durum"] = simulasyon.yeni_durum(veri["izgara"], veri["baslangic"], veri["ayarlar"])
+    veri["sira"] = 0
+    veri["log"] = []
+    haritayi_ciz()
+    bilgileri_guncelle("Sıfırlandı.")
+
+
+def sonuclari_kaydet():
+    durum = veri["durum"]
+    sonuc = {
+        "konum": [durum["x"], durum["y"]],
+        "yon": durum["yon"],
+        "batarya": durum["batarya"],
+        "yuk": durum["yuk"],
+        "teslim": durum["teslim"],
+        "carpisma": durum["carpisma"],
+        "toplam_adim": durum["toplam_adim"],
+        "batarya_bitti": durum["bitti"],
+        "en_cok_ziyaret": simulasyon.en_cok_ziyaret(durum["ziyaret"]),
+        "hatali_satirlar": veri["hatalar"],
+    }
+    try:
+        simulasyon.sonuc_yaz(sonuc, veri["klasor"] + "/sonuc.json")
+        simulasyon.log_yaz(veri["log"], veri["klasor"] + "/log.csv")
+        messagebox.showinfo("Bitti", "Simülasyon bitti.\nsonuc.json ve log.csv klasöre kaydedildi.")
+    except OSError as hata:
+        messagebox.showerror("Kayıt hatası", "Dosyalar yazılamadı:\n" + str(hata))
+
+def dosyalari_yukle_butonu():
+    klasor = filedialog.askdirectory(title="harita.txt, komutlar.txt ve ayarlar.json olan klasörü seçin")
+    if not klasor:
+        return
+    try:
+        izgara, baslangic = simulasyon.harita_oku(klasor + "/harita.txt")
+        ayarlar = simulasyon.ayarlari_oku(klasor + "/ayarlar.json")
+        komutlar, hatalar = simulasyon.komutlari_oku(klasor + "/komutlar.txt")
+        durum = simulasyon.yeni_durum(izgara, baslangic, ayarlar)
+    except FileNotFoundError as hata:
+        messagebox.showerror("Dosya bulunamadı", "Bu dosya bulunamadı:\n" + str(hata.filename))
+        return
+    except ValueError as hata:
+        messagebox.showerror("Hatalı dosya", "Dosya okunamadı:\n" + str(hata))
+        return
+    except KeyError as hata:
+        messagebox.showerror("Eksik ayar", "ayarlar.json içinde bu ayar yok: " + str(hata))
+        return
+
+    veri["klasor"] = klasor
+    veri["izgara"] = izgara
+    veri["baslangic"] = baslangic
+    veri["ayarlar"] = ayarlar
+    veri["komutlar"] = komutlar
+    veri["hatalar"] = hatalar
+    veri["durum"] = durum
+    veri["sira"] = 0
+    veri["log"] = []
+    haritayi_ciz()
+    bilgileri_guncelle("Dosyalar yüklendi.")
+
+    if len(hatalar) > 0:
+        mesaj = str(len(hatalar)) + " hatalı satır atlandı:\n\n"
+        for h in hatalar:
+            mesaj += "Satır " + str(h["satir"]) + ": " + h["icerik"] + "  (" + h["neden"] + ")\n"
+        messagebox.showwarning("Hatalı komut satırları", mesaj)
+
+
+# ===== 3) PENCERE =====
+pencere = tk.Tk()
+pencere.title("Depo Robotu Simülatörü")
+
+butonlar = tk.Frame(pencere)
+butonlar.pack(side="top", fill="x", padx=10, pady=10)
+tk.Button(butonlar, text="Dosyaları Yükle", command=dosyalari_yukle_butonu).pack(side="left", padx=4)
+tk.Button(butonlar, text="Adım", command=adim_butonu).pack(side="left", padx=4)
+tk.Button(butonlar, text="Tümünü Çalıştır", command=tumunu_calistir_butonu).pack(side="left", padx=4)
+tk.Button(butonlar, text="Sıfırla", command=sifirla_butonu).pack(side="left", padx=4)
+
+orta = tk.Frame(pencere)
+orta.pack(side="top", padx=10, pady=10)
+
+tuval = tk.Canvas(orta, width=480, height=320, bg="#eeeeee")
+tuval.pack(side="left")
+
+panel = tk.Frame(orta, padx=15)
+panel.pack(side="left", anchor="n")
+tk.Label(panel, text="Robot Bilgileri", font=("Arial", 13, "bold")).pack(anchor="w", pady=(0, 8))
+etiket_batarya = tk.Label(panel, text="Batarya: -", font=("Arial", 11))
+etiket_batarya.pack(anchor="w")
+etiket_yon = tk.Label(panel, text="Yön: -", font=("Arial", 11))
+etiket_yon.pack(anchor="w")
+etiket_yuk = tk.Label(panel, text="Yük: -", font=("Arial", 11))
+etiket_yuk.pack(anchor="w")
+etiket_teslim = tk.Label(panel, text="Teslim: -", font=("Arial", 11))
+etiket_teslim.pack(anchor="w")
+etiket_carpisma = tk.Label(panel, text="Çarpışma: -", font=("Arial", 11))
+etiket_carpisma.pack(anchor="w")
+etiket_siradaki = tk.Label(panel, text="Sıradaki komut: -", font=("Arial", 11))
+etiket_siradaki.pack(anchor="w", pady=(8, 0))
+etiket_ilerleme = tk.Label(panel, text="Komut: -", font=("Arial", 11))
+etiket_ilerleme.pack(anchor="w")
+
+etiket_log = tk.Label(pencere, text="Başlamak için 'Dosyaları Yükle'ye basın.", font=("Arial", 11), fg="#333333")
+etiket_log.pack(side="top", anchor="w", padx=10, pady=10)
+
+
+
+pencere.mainloop()
